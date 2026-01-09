@@ -3,6 +3,7 @@ import pandas as pd
 import os
 import base64
 import subprocess
+import sys
 import streamlit.components.v1 as components
 
 # --- IMPORT MODULE VISUALISASI SENDIRI ---
@@ -299,3 +300,4 @@ elif menu == "Update Data":
                     st.error(f"Error system: {e}")
             else:
                 st.error(f"❌ File tidak ditemukan: {SCRIPT_SCRAPER}")
+
