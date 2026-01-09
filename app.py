@@ -106,7 +106,7 @@ FILE_DATA = os.path.join(FOLDER_DATA, 'hasil_analisis_final.xlsx')
 FILE_MAP = os.path.join(FOLDER_DATA, 'peta_gadget_jawa.html')
 
 # Path Lengkap ke Script Scraper
-SCRIPT_SCRAPER = os.path.join(FOLDER_SCRAPER, 'scraper_olx_to_data.py')
+SCRIPT_SCRAPER = os.path.join(FOLDER_SCRAPER, 'scraper_olx.py')
 SCRIPT_PROCESSOR = os.path.join(FOLDER_SCRAPER, 'processing.py')
 
 # --- 5. LOAD DATA ---
@@ -325,5 +325,6 @@ elif menu == "Update Data":
                     st.error("⚠️ Scraper berhasil, tetapi Processing gagal.")
             else:
                 st.error("⚠️ Proses Scraping gagal. Processing dibatalkan.")
+
 
 
