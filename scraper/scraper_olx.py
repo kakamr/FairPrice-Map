@@ -2,101 +2,95 @@ import time
 import pandas as pd
 import random
 import os
-import shutil
+import sys 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import TimeoutException, StaleElementReferenceException
 
 # --- KONFIGURASI ---
-TARGET_MINIMAL = 200  # Ubah sesuai kebutuhan (misal 200)
-
-# Path Output
-FOLDER_DATA = "data"
-FILENAME = "hasil_analisis_final.xlsx" # Kita langsung simpan ke Excel agar App.py bisa baca
-# Atau csv jika app.py kamu bacanya csv: FILENAME = "data_hp_jawa_fix_lokasi.csv"
-
-# Pastikan path absolut agar tidak nyasar
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) # Naik 1 level dari folder scraper
-FULL_PATH = os.path.join(BASE_DIR, FOLDER_DATA, FILENAME)
+TARGET_MINIMAL = 200
+FOLDER_NAME = "data"  # Nama folder penyimpanan
+FILE_NAME = "data_hp_jawa_fix_lokasi.csv" # Nama file output
+# Gunakan absolute path agar aman di Cloud
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FULL_PATH = os.path.join(BASE_DIR, FOLDER_NAME, FILE_NAME) 
 
 DAFTAR_LOKASI = {
     "DKI Jakarta": "jakarta-dki_g2000007",
-    "Jawa Barat": "jawa-barat_g2000009",
-    "Jawa Tengah": "jawa-tengah_g2000010",
-    "DI Yogyakarta": "yogyakarta-di_g2000032",
-    "Jawa Timur": "jawa-timur_g2000011",
-    "Banten": "banten_g2000004"
+    "Jawa Barat": "jawa-barat_g2000006", 
+    "Jawa Tengah": "jawa-tengah_g2000005",
+    "DI Yogyakarta": "di-yogyakarta_g2000008",
+    "Jawa Timur": "jawa-timur_g2000004",
+    "Banten": "banten_g2000003"
 }
 
-def get_driver():
-    """Fungsi Cerdas untuk mendeteksi Environment (Local vs Cloud)"""
-    options = Options()
-    options.add_argument("--headless=new") # Wajib untuk server
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--window-size=1920,1080")
-    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
-
-    # Cek apakah Chromium ada di lokasi standar Linux (Streamlit Cloud)
-    chromium_path = "/usr/bin/chromium"
-    chromedriver_path = "/usr/bin/chromedriver"
-
-    if os.path.exists(chromium_path) and os.path.exists(chromedriver_path):
-        print("[INFO] Terdeteksi Lingkungan Linux/Cloud. Menggunakan Chromium System.")
-        options.binary_location = chromium_path
-        service = Service(chromedriver_path)
-        return webdriver.Chrome(service=service, options=options)
-    else:
-        print("[INFO] Terdeteksi Lingkungan Local/Windows. Menggunakan ChromeDriverManager.")
-        return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-
 def run_scraper():
-    print(f"[START] Memulai Scraping OLX...")
-    print(f"[INFO] Target Output: {FULL_PATH}")
+    print(f"🚀 Memulai Scraping (Output Folder: {FOLDER_NAME})...")
 
-    # Buat folder jika belum ada
-    if not os.path.exists(os.path.dirname(FULL_PATH)):
-        os.makedirs(os.path.dirname(FULL_PATH))
-        print(f"[INFO] Folder '{FOLDER_DATA}' dibuat.")
-
-    all_data = []
+    # 1. BUAT FOLDER JIKA BELUM ADA (Gunakan Path Absolute)
+    folder_abs_path = os.path.join(BASE_DIR, FOLDER_NAME)
+    if not os.path.exists(folder_abs_path):
+        os.makedirs(folder_abs_path)
+        print(f"📂 Folder '{folder_abs_path}' berhasil dibuat.")
 
     # --- LOOPING PROVINSI ---
     for provinsi, slug in DAFTAR_LOKASI.items():
         print(f"\n" + "="*50)
         print(f"📍 Membuka Provinsi: {provinsi}...")
         
-        driver = None
+        # --- [BAGIAN INI DITAMBAH UNTUK STREAMLIT CLOUD] ---
+        options = webdriver.ChromeOptions()
+        options.add_argument("--headless=new")  # Wajib: Jalan tanpa layar
+        options.add_argument("--no-sandbox")    # Wajib: Keamanan Linux
+        options.add_argument("--disable-dev-shm-usage") # Wajib: Memory handling
+        options.add_argument("--disable-gpu")
+        options.add_argument("--window-size=1920,1080")
+        options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36")
+        
         try:
-            driver = get_driver()
+            # Cara 1: Coba install otomatis
+            driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+        except Exception as e:
+            print(f"⚠️ Driver otomatis gagal, mencoba path manual Linux... ({e})")
+            # Cara 2: Fallback manual path (khusus Streamlit Cloud)
+            try:
+                options.binary_location = "/usr/bin/chromium"
+                service = Service("/usr/bin/chromedriver")
+                driver = webdriver.Chrome(service=service, options=options)
+            except Exception as e2:
+                print(f"❌ Gagal membuka browser: {e2}")
+                continue # Skip provinsi ini jika driver gagal total
+        # --- [AKHIR PENAMBAHAN] ---
+        
+        all_data_provinsi = [] # Tampung data per provinsi dulu
+
+        try:
             url = f"https://www.olx.co.id/{slug}/handphone_c208"
             driver.get(url)
             time.sleep(3)
 
             # --- FASE 1: LOAD MORE ---
-            print(f"   🔄 Memulai Load More (Target: {TARGET_MINIMAL})...")
+            print(f"   🔄 Memulai proses 'Load More' (Target: {TARGET_MINIMAL})...")
             consecutive_fails = 0
             last_item_count = 0
             
             while True:
                 items = driver.find_elements(By.CSS_SELECTOR, "li[data-aut-id='itemBox']")
                 current_count = len(items)
-                print(f"      -> Terkumpul: {current_count} items")
+                print(f"      -> Data terkumpul: {current_count} / {TARGET_MINIMAL}")
 
                 if current_count >= TARGET_MINIMAL:
-                    print("      ✅ Target tercapai!")
+                    print("      ✅ Target tercapai! Lanjut ekstrak.")
                     break
                 
                 if current_count == last_item_count and current_count > 0:
                     consecutive_fails += 1
                     if consecutive_fails >= 3:
-                        print("      ⚠️ Data mentok 3x. Stop.")
+                        print("      ⚠️ Data mentok 3x. Stop klik.")
                         break
                 else:
                     consecutive_fails = 0
@@ -112,83 +106,79 @@ def run_scraper():
                     driver.execute_script("arguments[0].click();", load_btn)
                     time.sleep(3) 
                 except TimeoutException:
-                    print("      ⚠️ Tombol habis.")
+                    print("      ⚠️ Tombol habis/hilang.")
                     break
-                except Exception:
+                except Exception as e:
+                    print(f"      ❌ Error klik: {e}")
                     break
 
             # --- FASE 2: EKSTRAKSI ---
-            print(f"   📝 Menyalin data {provinsi}...")
+            print(f"   📝 Menyalin detail data {provinsi}...")
             items = driver.find_elements(By.CSS_SELECTOR, "li[data-aut-id='itemBox']")
             
             count_local = 0
             for item in items:
                 try:
+                    # AMBIL JUDUL
                     try: judul = item.find_element(By.CSS_SELECTOR, "span[data-aut-id='itemTitle']").text
                     except: judul = "N/A"
 
+                    # AMBIL HARGA
                     try: 
                         harga_text = item.find_element(By.CSS_SELECTOR, "span[data-aut-id='itemPrice']").text
-                        # Bersihkan harga jadi angka murni
-                        harga_clean = int(harga_text.replace("Rp", "").replace(".", "").strip())
-                    except: harga_clean = 0
+                        harga_clean = harga_text.replace("Rp", "").replace(".", "").strip()
+                    except: harga_clean = "0"
 
+                    # AMBIL LOKASI (Pakai ID item-location)
                     try: 
                         lokasi = item.find_element(By.CSS_SELECTOR, "span[data-aut-id='item-location']").text
                     except: 
-                        lokasi = provinsi
+                        # Fallback jika ID tidak ketemu
+                        try:
+                            lokasi = provinsi # Default
+                        except:
+                            lokasi = provinsi
                     
+                    # AMBIL LINK
                     try: link = item.find_element(By.TAG_NAME, "a").get_attribute("href")
                     except: link = "N/A"
 
-                    # FILTER SEDERHANA
-                    if harga_clean < 100000 or judul == "N/A": continue
+                    # Validasi
+                    if harga_clean == "0" or judul == "N/A": continue
 
-                    # LOGIKA TAMBAHAN (BRAND & KELAS) UNTUK DASHBOARD
-                    brand = "Lainnya"
-                    if "iphone" in judul.lower(): brand = "Iphone"
-                    elif "samsung" in judul.lower(): brand = "Samsung"
-                    elif "xiaomi" in judul.lower(): brand = "Xiaomi"
-                    
-                    kelas = "Entry Level"
-                    if harga_clean > 7000000: kelas = "Flagship (Sultan)"
-                    elif harga_clean > 3000000: kelas = "Mid-Range"
-
-                    all_data.append({
-                        "Judul": judul,
-                        "Harga_Int": harga_clean, # Nama kolom disesuaikan dgn app.py
-                        "Brand": brand,
-                        "Kelas_Sosial": kelas,
+                    all_data_provinsi.append({
                         "Provinsi": provinsi,
+                        "Judul": judul,
+                        "Harga": harga_clean,
                         "Lokasi_Detail": lokasi,
                         "Link": link
                     })
                     count_local += 1
                 except: continue
             
-            print(f"   💾 Ambil {count_local} data.")
+            print(f"   💾 Berhasil ambil {count_local} data valid.")
 
         except Exception as e:
-            print(f"   ❌ Error {provinsi}: {e}")
+            print(f"   ❌ TERJADI ERROR DI {provinsi}: {e}")
         
         finally:
-            if driver: driver.quit()
-
-    # --- SIMPAN SEMUA DATA KE EXCEL ---
-    print(f"\n💾 Menyimpan Total {len(all_data)} data ke Excel...")
-    if all_data:
-        df = pd.DataFrame(all_data)
-        # Hapus duplikat link
-        df.drop_duplicates(subset=['Link'], inplace=True)
-        
-        # Simpan ke Excel (agar app.py langsung bisa baca formatnya)
-        df.to_excel(FULL_PATH, index=False)
-        print(f"✅ SUKSES! File tersimpan di: {FULL_PATH}")
-    else:
-        print("⚠️ Tidak ada data yang didapat.")
+            if 'driver' in locals():
+                driver.quit()
+            
+            # --- SIMPAN DATA KE FOLDER 'DATA' ---
+            if all_data_provinsi:
+                df = pd.DataFrame(all_data_provinsi)
+                
+                # Cek apakah file sudah ada di dalam folder data
+                file_exists = os.path.isfile(FULL_PATH)
+                
+                # Simpan mode append
+                df.to_csv(FULL_PATH, mode='a', header=not file_exists, index=False)
+                print(f"   ✅ Data {provinsi} tersimpan ke '{FULL_PATH}'")
+            else:
+                print(f"   ⚠️ Tidak ada data yang disimpan untuk {provinsi}.")
 
     print("\n🎉 SELESAI SEMUA PROVINSI!")
 
 if __name__ == "__main__":
     run_scraper()
-
