@@ -21,11 +21,11 @@ FULL_PATH = os.path.join(BASE_DIR, FOLDER_NAME, FILE_NAME)
 
 DAFTAR_LOKASI = {
     "DKI Jakarta": "jakarta-dki_g2000007",
-    "Jawa Barat": "jawa-barat_g2000006", 
-    "Jawa Tengah": "jawa-tengah_g2000005",
-    "DI Yogyakarta": "di-yogyakarta_g2000008",
-    "Jawa Timur": "jawa-timur_g2000004",
-    "Banten": "banten_g2000003"
+    "Jawa Barat": "jawa-barat_g2000009",
+    "Jawa Tengah": "jawa-tengah_g2000010",
+    "DI Yogyakarta": "yogyakarta-di_g2000032",
+    "Jawa Timur": "jawa-timur_g2000011",
+    "Banten": "banten_g2000004"
 }
 
 def run_scraper():
@@ -182,3 +182,4 @@ def run_scraper():
 
 if __name__ == "__main__":
     run_scraper()
+
