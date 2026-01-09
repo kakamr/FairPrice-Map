@@ -13,7 +13,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 
 # --- KONFIGURASI ---
-TARGET_MINIMAL = 50  # Ubah sesuai kebutuhan (misal 200)
+TARGET_MINIMAL = 200  # Ubah sesuai kebutuhan (misal 200)
 
 # Path Output
 FOLDER_DATA = "data"
@@ -191,3 +191,4 @@ def run_scraper():
 
 if __name__ == "__main__":
     run_scraper()
+
