@@ -1,76 +1,99 @@
 import pandas as pd
 import os
+import glob
 
-# --- KONFIGURASI PATH ---
-# Mengambil path folder project (naik satu level dari folder 'scraper')
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-INPUT_CSV = os.path.join(BASE_DIR, 'data', 'data_hp_jawa_fix_lokasi.csv')
-OUTPUT_EXCEL = os.path.join(BASE_DIR, 'data', 'hasil_analisis_final.xlsx')
+# --- KONFIGURASI ---
+FOLDER_NAME = 'data'  # Nama folder
+OUTPUT_FILE = 'hasil_analisis_final.xlsx' # Nama file output
 
-def clean_price(price):
-    """Membersihkan format Rp dan titik"""
-    try:
-        if isinstance(price, str):
-            clean = price.replace('Rp', '').replace('.', '').replace(',', '').strip()
-            return int(clean)
-        return int(price)
-    except:
-        return 0
-
-def detect_brand(title):
-    """Mendeteksi brand berdasarkan judul"""
-    title = str(title).lower()
-    if 'iphone' in title: return 'Iphone'
-    if 'samsung' in title: return 'Samsung'
-    if 'xiaomi' in title or 'redmi' in title or 'poco' in title: return 'Xiaomi'
-    if 'oppo' in title: return 'Oppo'
-    if 'vivo' in title: return 'Vivo'
-    if 'realme' in title: return 'Realme'
-    if 'infinix' in title: return 'Infinix'
-    if 'asus' in title or 'rog' in title: return 'Asus'
-    return 'Lainnya'
-
-def classify_class(price):
-    """Mengelompokkan kelas sosial berdasarkan harga"""
-    if price < 1500000: return 'Entry Level'
-    elif 1500000 <= price < 4000000: return 'Mid Range'
-    elif 4000000 <= price < 8000000: return 'High End'
-    else: return 'Flagship/Sultan'
-
-def run_processing():
-    print(f"⚙️ Memulai Processing Data...")
-    print(f"   📂 Membaca file: {INPUT_CSV}")
-
-    if not os.path.exists(INPUT_CSV):
-        print("   ❌ File CSV tidak ditemukan. Harap scraping dulu.")
+def process_data():
+    # Cek apakah folder ada
+    if not os.path.exists(FOLDER_NAME):
+        print(f"❌ Error: Folder '{FOLDER_NAME}' tidak ditemukan.")
+        print(f"👉 Buat folder bernama '{FOLDER_NAME}' dan masukkan file CSV hasil scraping ke dalamnya.")
         return
 
-    # 1. Load Data CSV
-    try:
-        df = pd.read_csv(INPUT_CSV)
-    except Exception as e:
-        print(f"   ❌ Gagal membaca CSV: {e}")
-        return
-
-    print(f"   📊 Data mentah ditemukan: {len(df)} baris")
-
-    # 2. Cleaning Harga
-    df['Harga_Int'] = df['Harga'].apply(clean_price)
+    print(f"📂 Mencari file CSV di dalam folder '{FOLDER_NAME}'...")
     
-    # Hapus harga aneh (misal di bawah 100rb atau 0)
-    df = df[df['Harga_Int'] > 100000]
+    # 1. Cari semua file .csv di dalam folder 'data'
+    # Pattern: data/*.csv
+    search_path = os.path.join(FOLDER_NAME, "*.csv")
+    csv_files = glob.glob(search_path)
+    
+    if not csv_files:
+        print(f"❌ Tidak ada file CSV di folder '{FOLDER_NAME}'.")
+        return
 
-    # 3. Klasifikasi Brand & Kelas
-    df['Brand'] = df['Judul'].apply(detect_brand)
-    df['Kelas_Sosial'] = df['Harga_Int'].apply(classify_class)
+    # 2. Gabungkan File
+    df_list = []
+    for filename in csv_files:
+        try:
+            print(f"   -> Membaca: {os.path.basename(filename)}...")
+            temp_df = pd.read_csv(filename)
+            df_list.append(temp_df)
+        except Exception as e:
+            print(f"   ❌ Gagal baca {filename}: {e}")
 
-    # 4. Hapus Duplikat
-    df.drop_duplicates(subset=['Judul', 'Harga_Int', 'Lokasi_Detail'], inplace=True)
+    if not df_list:
+        return
 
-    # 5. Simpan ke Excel (Wajib pakai engine openpyxl untuk xlsx)
-    print(f"   💾 Menyimpan ke: {OUTPUT_EXCEL}")
-    df.to_excel(OUTPUT_EXCEL, index=False)
-    print(f"   ✅ Processing Selesai! Data bersih: {len(df)} baris siap divisualisasikan.")
+    df = pd.concat(df_list, ignore_index=True)
+    print(f"✅ Total data mentah: {len(df)} baris.")
+
+    # 3. PROCESSING (Cleaning & Categorization)
+    print("🧹 Sedang memproses data...")
+    
+    # A. Bersihkan Harga
+    df['Harga_Clean'] = df['Harga'].astype(str).str.replace('Rp', '', case=False).str.replace('.', '').str.strip()
+    df['Harga_Int'] = pd.to_numeric(df['Harga_Clean'], errors='coerce').fillna(0).astype(int)
+
+    # B. Kategorisasi Kelas (Range Baru: <2jt, 2-5jt, >5jt)
+    def categorize_class(price):
+        if price > 5000000:
+            return 'High End / Sultan'
+        elif 2000000 <= price <= 5000000:
+            return 'Middle Class'
+        else:
+            return 'Entry Level'
+
+    df['Kelas_Sosial'] = df['Harga_Int'].apply(categorize_class)
+
+    # C. Ekstraksi Brand
+    brands = [
+        'iphone', 'samsung', 'xiaomi', 'redmi', 'oppo', 'vivo', 
+        'realme', 'infinix', 'asus', 'rog', 'google', 'pixel', 
+        'poco', 'tecno', 'itel', 'sony', 'huawei', 'nokia', 'advan'
+    ]
+
+    def extract_brand(title):
+        title_lower = str(title).lower()
+        for brand in brands:
+            if brand in title_lower:
+                if brand == 'rog': return 'Asus'
+                if brand == 'redmi': return 'Xiaomi'
+                if brand == 'pixel': return 'Google'
+                return brand.capitalize()
+        return 'Lainnya/Unknown'
+
+    df['Brand'] = df['Judul'].apply(extract_brand)
+
+    # 4. SIMPAN KE FOLDER DATA
+    # Path lengkap: data/hasil_analisis_final.xlsx
+    output_path = os.path.join(FOLDER_NAME, OUTPUT_FILE)
+    
+    try:
+        df.to_excel(output_path, index=False)
+        print("\n" + "="*50)
+        print(f"🎉 SUKSES! File berhasil disimpan di:")
+        print(f"📂 {output_path}")
+        print("="*50)
+        
+        # Info Singkat
+        print(df['Kelas_Sosial'].value_counts())
+        
+    except Exception as e:
+        print(f"❌ Gagal menyimpan file: {e}")
+        print("Pastikan file Excel tidak sedang dibuka!")
 
 if __name__ == "__main__":
-    run_processing()
+    process_data()
