@@ -30,18 +30,20 @@ DAFTAR_LOKASI = {
 }
 
 def run_scraper():
-    print(f"🚀 Memulai Scraping (Output: {FILE_NAME})")
-    
-    # 1. SETUP FOLDER
+    print(f"🚀 Memulai Scraping (Output Folder: {FOLDER_NAME})...")
+
+    # 1. BUAT FOLDER JIKA BELUM ADA (Gunakan Path Absolute)
     folder_abs_path = os.path.join(BASE_DIR, FOLDER_NAME)
     if not os.path.exists(folder_abs_path):
         os.makedirs(folder_abs_path)
+        print(f"📂 Folder '{folder_abs_path}' berhasil dibuat.")
 
     # --- LOOPING PROVINSI ---
     for provinsi, slug in DAFTAR_LOKASI.items():
-        print(f"\n📍 {provinsi}...", end=" ", flush=True) # Print satu baris saja
+        print(f"\n" + "="*50)
+        print(f"📍 Membuka Provinsi: {provinsi}...")
         
-        # --- SETUP BROWSER (HEADLESS) ---
+        # --- KONFIGURASI BROWSER (HEADLESS) ---
         options = webdriver.ChromeOptions()
         options.add_argument("--headless=new")
         options.add_argument("--no-sandbox")
@@ -52,26 +54,30 @@ def run_scraper():
         
         driver = None
         try:
+            # Coba install driver otomatis
+            driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+        except Exception:
+            # --- [PERUBAHAN DI SINI] ---
+            # Kita tidak nge-print error {e} yang panjang. Cukup info singkat.
+            print("      ⚠️ Driver otomatis tidak cocok. Beralih ke konfigurasi manual Linux...") 
+            
             try:
-                driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-            except:
-                # Fallback Linux Streamlit Cloud
                 options.binary_location = "/usr/bin/chromium"
                 service = Service("/usr/bin/chromedriver")
                 driver = webdriver.Chrome(service=service, options=options)
-        except Exception:
-            print("❌ Gagal Driver.")
-            continue
-        
-        all_data_provinsi = []
+            except Exception as e2:
+                print(f"      ❌ Gagal membuka browser (Manual): {e2}")
+                continue # Skip provinsi ini
+
+        all_data_provinsi = [] 
 
         try:
             url = f"https://www.olx.co.id/{slug}/handphone_c208"
             driver.get(url)
             time.sleep(3)
 
-            # --- FASE 1: LOAD MORE (VERSI QUIET) ---
-            # print(f"   🔄 Load More...") # Dihapus biar gak panjang
+            # --- FASE 1: LOAD MORE ---
+            print(f"   🔄 Memulai proses 'Load More' (Target: {TARGET_MINIMAL})...")
             consecutive_fails = 0
             last_item_count = 0
             
@@ -79,17 +85,18 @@ def run_scraper():
                 items = driver.find_elements(By.CSS_SELECTOR, "li[data-aut-id='itemBox']")
                 current_count = len(items)
                 
-                # --- MODIFIKASI: Hanya print status setiap 50 data ---
-                if current_count % 50 == 0 and current_count > 0:
-                    print(f"[{current_count}]..", end=" ", flush=True)
-                # -----------------------------------------------------
+                # --- [TETAP DIPERTAHANKAN SESUAI REQUEST] ---
+                print(f"      -> Data terkumpul: {current_count} / {TARGET_MINIMAL}")
 
                 if current_count >= TARGET_MINIMAL:
+                    print("      ✅ Target tercapai! Lanjut ekstrak.")
                     break
                 
                 if current_count == last_item_count and current_count > 0:
                     consecutive_fails += 1
-                    if consecutive_fails >= 3: break
+                    if consecutive_fails >= 3:
+                        print("      ⚠️ Data mentok 3x. Stop klik.")
+                        break
                 else:
                     consecutive_fails = 0
                 
@@ -102,13 +109,19 @@ def run_scraper():
                     driver.execute_script("arguments[0].scrollIntoView({block: 'center', inline: 'center'});", load_btn)
                     time.sleep(1)
                     driver.execute_script("arguments[0].click();", load_btn)
-                    time.sleep(2) 
-                except:
+                    time.sleep(3) 
+                except TimeoutException:
+                    print("      ⚠️ Tombol habis/hilang.")
+                    break
+                except Exception as e:
+                    print(f"      ❌ Error klik: {e}")
                     break
 
             # --- FASE 2: EKSTRAKSI ---
+            print(f"   📝 Menyalin detail data {provinsi}...")
             items = driver.find_elements(By.CSS_SELECTOR, "li[data-aut-id='itemBox']")
             
+            count_local = 0
             for item in items:
                 try:
                     try: judul = item.find_element(By.CSS_SELECTOR, "span[data-aut-id='itemTitle']").text
@@ -119,7 +132,8 @@ def run_scraper():
                         harga_clean = harga_text.replace("Rp", "").replace(".", "").strip()
                     except: harga_clean = "0"
 
-                    try: lokasi = item.find_element(By.CSS_SELECTOR, "span[data-aut-id='item-location']").text
+                    try: 
+                        lokasi = item.find_element(By.CSS_SELECTOR, "span[data-aut-id='item-location']").text
                     except: lokasi = provinsi
                     
                     try: link = item.find_element(By.TAG_NAME, "a").get_attribute("href")
@@ -134,24 +148,28 @@ def run_scraper():
                         "Lokasi_Detail": lokasi,
                         "Link": link
                     })
+                    count_local += 1
                 except: continue
+            
+            print(f"   💾 Berhasil ambil {count_local} data valid.")
+
+        except Exception as e:
+            print(f"   ❌ TERJADI ERROR DI {provinsi}: {e}")
+        
+        finally:
+            if driver:
+                driver.quit()
             
             # --- SIMPAN DATA ---
             if all_data_provinsi:
                 df = pd.DataFrame(all_data_provinsi)
                 file_exists = os.path.isfile(FULL_PATH)
                 df.to_csv(FULL_PATH, mode='a', header=not file_exists, index=False)
-                print(f"✅ OK ({len(all_data_provinsi)} data)") # Print singkat
+                print(f"   ✅ Data {provinsi} tersimpan ke '{FULL_PATH}'")
             else:
-                print(f"⚠️ Kosong")
-            
-        except Exception as e:
-            print(f"❌ Err: {e}")
-        
-        finally:
-            if driver: driver.quit()
+                print(f"   ⚠️ Tidak ada data yang disimpan untuk {provinsi}.")
 
-    print("\n🎉 SELESAI!")
+    print("\n🎉 SELESAI SEMUA PROVINSI!")
 
 if __name__ == "__main__":
     run_scraper()
