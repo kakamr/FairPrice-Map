@@ -247,57 +247,80 @@ elif menu == "Map GIS":
 # ==============================================================================
 elif menu == "Update Data":
     st.title("⚙️ Update Database Real-Time")
-    st.write("Fitur ini akan menjalankan **Bot Scraper** untuk mengambil data terbaru dari Marketplace.")
+    st.write("Fitur ini akan menjalankan **Bot Scraper** lalu **Data Processing** secara otomatis.")
     
     col1, col2 = st.columns([1, 2])
     
     with col1:
-        st.warning("⚠️ **Perhatian:** Proses ini memakan waktu (5-10 menit) tergantung koneksi internet.")
-        start_btn = st.button("🚀 Mulai Scraping Data", type="primary")
+        st.warning("⚠️ **Perhatian:** Proses total memakan waktu 5-15 menit.")
+        start_btn = st.button("🚀 Mulai Update Full", type="primary")
     
     with col2:
         st.subheader("Terminal Log:")
         log_container = st.empty()
         
-        if start_btn:
-            if os.path.exists(SCRIPT_SCRAPER):
-                st.info(f"Menjalankan script: {SCRIPT_SCRAPER}") 
-                try:
-                    # Setting ENV
-                    env = os.environ.copy()
-                    env["PYTHONIOENCODING"] = "utf-8"
-                    env["PYTHONUNBUFFERED"] = "1"
-                    
-                    # --- PERBAIKAN UTAMA DI SINI ---
-                    # Ganti 'python' menjadi sys.executable
-                    # sys.executable = Path ke python.exe yang sedang aktif (yang punya pandas)
-                    process = subprocess.Popen(
-                        [sys.executable, SCRIPT_SCRAPER],  # <--- GANTI INI
-                        stdout=subprocess.PIPE, 
-                        stderr=subprocess.STDOUT, 
-                        text=True, 
-                        bufsize=1,
-                        encoding='utf-8', 
-                        env=env
-                    )
-                    
-                    logs = ""
-                    while True:
-                        line = process.stdout.readline()
-                        if not line and process.poll() is not None:
-                            break
-                        if line:
-                            logs += line 
-                            log_container.code(logs, language="bash")
-                    
-                    if process.returncode == 0:
-                        st.success("✅ Proses Scraping Selesai! Silakan Refresh halaman.")
-                        st.cache_data.clear()
-                    else:
-                        st.error("❌ Terjadi kesalahan saat scraping (Return Code != 0). Cek log di atas.")
-                        
-                except Exception as e:
-                    st.error(f"Error system: {e}")
-            else:
-                st.error(f"❌ File tidak ditemukan: {SCRIPT_SCRAPER}")
+        # --- FUNGSI REUSABLE UNTUK MENJALANKAN SCRIPT ---
+        def run_script_in_subprocess(script_path, log_placeholder, current_logs):
+            """Menjalankan script python via subprocess dan streaming output ke UI"""
+            if not os.path.exists(script_path):
+                log_placeholder.error(f"❌ File tidak ditemukan: {script_path}")
+                return False, current_logs
 
+            try:
+                current_logs += f"\n🔵 [SYSTEM] Menjalankan: {script_path}...\n"
+                log_placeholder.code(current_logs, language="bash")
+                
+                env = os.environ.copy()
+                env["PYTHONIOENCODING"] = "utf-8"
+                env["PYTHONUNBUFFERED"] = "1"
+
+                process = subprocess.Popen(
+                    [sys.executable, script_path],
+                    stdout=subprocess.PIPE, 
+                    stderr=subprocess.STDOUT, 
+                    text=True, 
+                    bufsize=1,
+                    encoding='utf-8', 
+                    env=env
+                )
+                
+                while True:
+                    line = process.stdout.readline()
+                    if not line and process.poll() is not None:
+                        break
+                    if line:
+                        current_logs += line 
+                        # Update log di layar (batasi panjang agar tidak lag)
+                        log_placeholder.code(current_logs[-4000:], language="bash")
+                
+                if process.returncode == 0:
+                    current_logs += f"✅ [SUCCESS] {script_path} selesai.\n"
+                    return True, current_logs
+                else:
+                    current_logs += f"❌ [ERROR] {script_path} gagal (Code {process.returncode}).\n"
+                    return False, current_logs
+
+            except Exception as e:
+                current_logs += f"❌ [EXCEPTION] {e}\n"
+                log_placeholder.code(current_logs, language="bash")
+                return False, current_logs
+
+        # --- EKSEKUSI BERANTAI (CHAINING) ---
+        if start_btn:
+            full_logs = ""
+            
+            # 1. JALANKAN SCRAPER
+            success_scraper, full_logs = run_script_in_subprocess(SCRIPT_SCRAPER, log_container, full_logs)
+            
+            if success_scraper:
+                # 2. JALANKAN PROCESSING (Hanya jika Scraper Berhasil)
+                success_process, full_logs = run_script_in_subprocess(SCRIPT_PROCESSOR, log_container, full_logs)
+                
+                if success_process:
+                    st.success("🎉 Seluruh proses selesai! Database telah diperbarui.")
+                    st.balloons()
+                    st.cache_data.clear() # Hapus cache agar data baru terbaca
+                else:
+                    st.error("⚠️ Scraper berhasil, tetapi Processing gagal.")
+            else:
+                st.error("⚠️ Proses Scraping gagal. Processing dibatalkan.")
