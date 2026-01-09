@@ -256,20 +256,22 @@ elif menu == "Update Data":
     
     with col2:
         st.subheader("Terminal Log:")
-        # CONTAINER LOG (Console Output akan muncul di sini)
         log_container = st.empty()
         
         if start_btn:
             if os.path.exists(SCRIPT_SCRAPER):
                 st.info(f"Menjalankan script: {SCRIPT_SCRAPER}") 
                 try:
-                    # Setting ENV untuk encoding UTF-8 DAN Unbuffered Output
+                    # Setting ENV
                     env = os.environ.copy()
                     env["PYTHONIOENCODING"] = "utf-8"
-                    env["PYTHONUNBUFFERED"] = "1" # PENTING: Agar log muncul real-time
+                    env["PYTHONUNBUFFERED"] = "1"
                     
+                    # --- PERBAIKAN UTAMA DI SINI ---
+                    # Ganti 'python' menjadi sys.executable
+                    # sys.executable = Path ke python.exe yang sedang aktif (yang punya pandas)
                     process = subprocess.Popen(
-                        ['python', SCRIPT_SCRAPER], 
+                        [sys.executable, SCRIPT_SCRAPER],  # <--- GANTI INI
                         stdout=subprocess.PIPE, 
                         stderr=subprocess.STDOUT, 
                         text=True, 
@@ -279,14 +281,12 @@ elif menu == "Update Data":
                     )
                     
                     logs = ""
-                    # Loop terus menerus membaca output terminal
                     while True:
                         line = process.stdout.readline()
                         if not line and process.poll() is not None:
                             break
                         if line:
                             logs += line 
-                            # Tampilkan log di dalam container st.code (Tampilan ala Console)
                             log_container.code(logs, language="bash")
                     
                     if process.returncode == 0:
@@ -299,10 +299,3 @@ elif menu == "Update Data":
                     st.error(f"Error system: {e}")
             else:
                 st.error(f"❌ File tidak ditemukan: {SCRIPT_SCRAPER}")
-                st.write("Pastikan struktur folder Anda seperti ini:")
-                st.code("""
-                project/
-                ├── app.py
-                ├── scraper/
-                │   └── scraper_olx.py  <-- File ini harus ada di sini!
-                """)
