@@ -260,13 +260,23 @@ elif menu == "Update Data":
     
     with col2:
         st.subheader("Terminal Log:")
-        log_container = st.empty()
+        
+        # --- PERUBAHAN DI SINI ---
+        # Membuat container dengan tinggi tetap 400px dan border
+        # Konten di dalamnya otomatis akan punya scrollbar jika panjang
+        with st.container(height=400, border=True):
+            log_container = st.empty()
+            # Pesan awal agar kotak tidak kosong melompong
+            log_container.code("Menunggu perintah...", language="bash")
+        # -------------------------
         
         # --- FUNGSI REUSABLE UNTUK MENJALANKAN SCRIPT ---
         def run_script_in_subprocess(script_path, log_placeholder, current_logs):
             """Menjalankan script python via subprocess dan streaming output ke UI"""
             if not os.path.exists(script_path):
-                log_placeholder.error(f"❌ File tidak ditemukan: {script_path}")
+                # Tampilkan error di dalam kotak log
+                current_logs += f"❌ File tidak ditemukan: {script_path}\n"
+                log_placeholder.code(current_logs, language="bash")
                 return False, current_logs
 
             try:
@@ -293,8 +303,9 @@ elif menu == "Update Data":
                         break
                     if line:
                         current_logs += line 
-                        # Update log di layar (batasi panjang agar tidak lag)
-                        log_placeholder.code(current_logs[-4000:], language="bash")
+                        # Update log. Karena sudah di dalam st.container(height=...), 
+                        # scrollbar akan muncul otomatis.
+                        log_placeholder.code(current_logs, language="bash") 
                 
                 if process.returncode == 0:
                     current_logs += f"✅ [SUCCESS] {script_path} selesai.\n"
@@ -327,4 +338,3 @@ elif menu == "Update Data":
                     st.error("⚠️ Scraper berhasil, tetapi Processing gagal.")
             else:
                 st.error("⚠️ Proses Scraping gagal. Processing dibatalkan.")
-
