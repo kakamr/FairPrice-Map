@@ -1,36 +1,108 @@
-/* Styling tambahan untuk Custom HTML Views */
-h1 { font-size: 2.5rem; font-weight: 700; color: #FAFAFA; }
-h3 { font-size: 1.5rem; font-weight: 600; color: #FAFAFA; }
-p, li { font-size: 1rem; color: #E0E0E0; line-height: 1.6; }
-
-/* Simulasi Info & Success Box Streamlit */
-.st-info-box {
-    background-color: #e8f4f9;
-    color: #1e3a8a;
-    padding: 1rem;
-    border-radius: 0.5rem;
-    margin-top: 1rem;
-    border-left: 5px solid #3b82f6;
+/* --- 1. SETUP VARIABEL WARNA --- */
+:root {
+    --primary-color: #846fff;
+    --bg-color: #f6f4ff;
+    --text-color: #31333F;
+    --sidebar-bg: #FFFFFF;
 }
 
-.st-success-box {
-    background-color: #d1fae5;
-    color: #064e3b;
-    padding: 1rem;
-    border-radius: 0.5rem;
-    margin-top: 1rem;
-    border-left: 5px solid #10b981;
+/* --- 2. BACKGROUND UTAMA --- */
+.stApp {
+    background-color: var(--bg-color);
 }
 
-/* Layout 2 Kolom Manual untuk HTML */
-.row-container {
-    display: flex;
-    gap: 2rem;
-    margin-top: 1rem;
+/* --- 3. CUSTOM SIDEBAR --- */
+section[data-testid="stSidebar"] {
+    background-color: var(--sidebar-bg);
+    border-right: 1px solid #ddd;
 }
-.col-left { flex: 2; }
-.col-right { flex: 1; }
 
-@media (max-width: 768px) {
-    .row-container { flex-direction: column; }
+/* JUDUL SIDEBAR NAIK KE ATAS (PADDING FIX) */
+/* Mengurangi jarak kosong di atas sidebar secara paksa */
+section[data-testid="stSidebar"] .block-container {
+    padding-top: 1rem !important; /* Jarak atas diperkecil */
+    padding-bottom: 5rem !important; /* Space bawah untuk footer */
+}
+
+/* Menu Pill (Radio Button) */
+div.stRadio > div[role="radiogroup"] > label {
+    background-color: transparent;
+    padding: 10px 15px;
+    border-radius: 10px;
+    margin-bottom: 5px;
+    transition: all 0.3s ease;
+    border: 1px solid transparent;
+    cursor: pointer;
+}
+
+div.stRadio > div[role="radiogroup"] > label:hover {
+    background-color: #f0f0f5;
+    color: var(--primary-color);
+    transform: translateX(5px);
+}
+
+div.stRadio > div[role="radiogroup"] > label > div:first-child {
+    display: none;
+}
+
+div.stRadio > div[role="radiogroup"] > label > div[data-testid="stMarkdownContainer"] > p {
+    font-size: 16px;
+    font-weight: 500;
+}
+
+/* --- 4. TABEL & MAP --- */
+div[data-testid="stDataFrame"] {
+    background-color: white;
+    padding: 10px;
+    border-radius: 15px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+
+div[data-testid="stDataFrame"] th {
+    background-color: var(--primary-color) !important;
+    color: white !important;
+    text-align: center;
+}
+
+iframe {
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(132, 111, 255, 0.2);
+    border: 2px solid white;
+}
+
+div[data-testid="stMetric"] {
+    background-color: white;
+    padding: 15px;
+    border-radius: 10px;
+    border-left: 5px solid var(--primary-color);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+div[data-testid="stMetricValue"] {
+    color: var(--primary-color);
+    font-size: 28px !important;
+}
+
+/* --- 5. STICKY FOOTER (REVISI SIZE) --- */
+.sidebar-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 15rem; /* Ukuran default sidebar */
+    max-width: 100%; /* Safety agar tidak lewat layar */
+    background-color: var(--sidebar-bg);
+    padding: 15px;
+    text-align: center;
+    border-top: 1px solid #ddd;
+    font-size: 12px;
+    color: #888;
+    z-index: 9999; /* Z-index tinggi biar di atas */
+    box-sizing: border-box; /* Padding masuk dalam hitungan width */
+}
+
+/* Trik: Jika di layar kecil/zoom beda, kurangi sedikit lebarnya */
+@media (min-width: 576px) {
+    .sidebar-footer {
+        width: 15rem; 
+    }
 }
