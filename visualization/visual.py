@@ -57,6 +57,6 @@ def create_economic_profile(df):
         title="Komposisi Kelas Sosial Gadget per Wilayah",
         labels={"count": "Persentase (%)"},
         # Mengatur urutan warna agar konsisten
-        category_orders={"Kelas_Sosial": ["Entry Level", "Middle Class", "High End / Sultan"]} 
+        category_orders={"Kelas_Sosial": ["Entry Level", "Mid Range", "High End", "Flagship/Sultan"]} 
     )
     return fig
