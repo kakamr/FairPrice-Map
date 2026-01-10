@@ -16,7 +16,6 @@ def process_data():
     print(f"📂 Mencari file CSV di dalam folder '{FOLDER_NAME}'...")
     
     # 1. Cari semua file .csv di dalam folder 'data'
-    # Pattern: data/*.csv
     search_path = os.path.join(FOLDER_NAME, "*.csv")
     csv_files = glob.glob(search_path)
     
@@ -38,7 +37,8 @@ def process_data():
         return
 
     df = pd.concat(df_list, ignore_index=True)
-    print(f"✅ Total data mentah: {len(df)} baris.")
+    total_awal = len(df)
+    print(f"✅ Total data mentah masuk: {total_awal} baris.")
 
     # 3. PROCESSING (Cleaning & Categorization)
     print("🧹 Sedang memproses data...")
@@ -77,8 +77,17 @@ def process_data():
 
     df['Brand'] = df['Judul'].apply(extract_brand)
 
+    # --- [BAGIAN BARU: HAPUS DUPLIKAT] ---
+    print("♻️ Mengecek duplikat...")
+    # Kita anggap duplikat jika Judul, Harga, dan Lokasi sama persis
+    df.drop_duplicates(subset=['Judul', 'Harga_Int', 'Lokasi_Detail'], keep='first', inplace=True)
+    
+    total_akhir = len(df)
+    jumlah_duplikat = total_awal - total_akhir
+    print(f"   -> Dihapus {jumlah_duplikat} data duplikat.")
+    print(f"   -> Sisa data bersih: {total_akhir} baris.")
+
     # 4. SIMPAN KE FOLDER DATA
-    # Path lengkap: data/hasil_analisis_final.xlsx
     output_path = os.path.join(FOLDER_NAME, OUTPUT_FILE)
     
     try:
