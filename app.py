@@ -326,3 +326,5 @@ elif menu == "Update Data":
                     st.error("⚠️ Scraper berhasil, tetapi Processing gagal.")
             else:
                 st.error("⚠️ Proses Scraping gagal. Processing dibatalkan.")
+
+
